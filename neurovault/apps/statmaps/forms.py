@@ -37,7 +37,9 @@ from django.core.files import File
 from parsley.decorators import parsleyfy
 from neurovault.apps.statmaps.models import CognitiveAtlasTask
 from chosen import forms as chosenforms
+import neurovault.settings
 
+from compare.mrutils import _resample_img_ref
 
 # Create the form class.
 collection_fieldsets = [
@@ -408,7 +410,11 @@ class ImageForm(ModelForm):
                         del cleaned_data["file"]
                         return cleaned_data
                     
-                    is_thr, perc_bad = is_thresholded(nii)
+                    # Check if the image is thresholded, default is 0.25 "defined" voxels
+                    brain_mask = nb.load(os.path.join(neurovault.settings.STATIC_ROOT,"anatomical","MNI152_mask.nii.gz"))
+                    brain = nb.load(os.path.join(neurovault.settings.STATIC_ROOT,"anatomical","MNI152.nii.gz"))
+                    nii_resample = _resample_img_ref(image=nii,reference=brain,interpolation="nearest")
+                    is_thr, perc_bad = is_thresholded(nii_obj=nii_resample,brain_mask=brain_mask)
                     if is_thr and not cleaned_data.get("ignore_warning_checkbox"):
                         self._errors["file"] = self.error_class(["This file seems to be thresholded (%d%% of voxels are zeroes).\n Please use an unthresholded version of the map if possible."%(perc_bad*100)])
                         self.fields["ignore_warning_checkbox"].widget = forms.CheckboxInput()

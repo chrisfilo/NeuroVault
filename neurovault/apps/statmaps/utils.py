@@ -387,14 +387,25 @@ def format_image_collection_names(image_name,collection_name,total_length,map_ty
    if map_type == None: return "%s : %s" %(image_name,collection_name)
    else: return "%s : %s [%s]" %(image_name,collection_name,map_type)
 
-#checks if map is thresholded
-def is_thresholded(nii_obj, thr=0.85):
-    data = nii_obj.get_data()
-    zero_mask = (data == 0)
-    nan_mask = (np.isnan(data))
-    missing_mask = zero_mask | nan_mask
-    ratio_bad = float(missing_mask.sum())/float(missing_mask.size)
-    if ratio_bad > thr:
-        return (True, ratio_bad)
-    else:
-        return (False, ratio_bad)
+# We are checking for at least 25% values so rankings are not different
+def is_thresholded(nii_obj,brain_mask,threshold=0.25):
+  data = nii_obj.get_data()
+  # Set everything outside brain mask to zero
+  data[brain_mask.get_data()==0] = 0
+  zero_mask = (data == 0)
+  nan_mask = (np.isnan(data))
+  inside_brain = brain_mask.get_data().astype("bool")
+  missing_mask = zero_mask | nan_mask
+  missing_inside_brain = missing_mask & inside_brain
+  ratio_bad = float(missing_inside_brain.sum())/float(inside_brain.sum())
+  ratio_good = 1-ratio_bad
+  if ratio_good < threshold:
+      return (True, ratio_good)
+  else:
+      return (False, ratio_good)
+
+'''Check for only positive values'''
+def is_only_positive(nii_obj):
+  lower,upper = get_voxel_range(nii_obj)
+  if lower>=0: return True
+  else: return False
