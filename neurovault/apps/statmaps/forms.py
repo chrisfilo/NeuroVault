@@ -22,7 +22,8 @@ from django.forms.forms import Form
 from django.forms.fields import FileField
 import tempfile
 from neurovault.apps.statmaps.utils import split_filename, get_paper_properties, \
-                                        detect_afni4D, split_afni4D_to_3D, memory_uploadfile
+                                        detect_afni4D, split_afni4D_to_3D, memory_uploadfile,\
+    is_thresholded
 from neurovault.apps.statmaps.nidm_results import NIDMUpload
 from django import forms
 from django.utils.encoding import smart_str
@@ -36,7 +37,9 @@ from django.core.files import File
 from parsley.decorators import parsleyfy
 from neurovault.apps.statmaps.models import CognitiveAtlasTask
 from chosen import forms as chosenforms
+import neurovault.settings
 
+from compare.mrutils import _resample_img_ref
 
 # Create the form class.
 collection_fieldsets = [
@@ -333,6 +336,7 @@ class OwnerCollectionForm(CollectionForm):
 
 class ImageForm(ModelForm):
     hdr_file = FileField(required=False, label='.hdr part of the map (if applicable)')
+    ignore_warning_checkbox = forms.BooleanField(label='Ignore warning', widget=forms.HiddenInput(), required=False, initial=False)
 
     def __init__(self, *args, **kwargs):
         super(ImageForm, self).__init__(*args, **kwargs)
@@ -347,7 +351,6 @@ class ImageForm(ModelForm):
         exclude = []
 
     def clean(self, **kwargs):
-
         cleaned_data = super(ImageForm, self).clean()
         file = cleaned_data.get("file")
 
@@ -400,13 +403,23 @@ class ImageForm(ModelForm):
                 if nii_tmp is not None and detect_afni4D(nii_tmp):
                     self.afni_subbricks = split_afni4D_to_3D(nii_tmp)
                 else:
-                
                     squeezable_dimensions = len(filter(lambda a: a not in [0,1], nii.shape))
                     
                     if squeezable_dimensions != 3:
                         self._errors["file"] = self.error_class(["4D files are not supported.\n If it's multiple maps in one file please split them and upload separately"])
                         del cleaned_data["file"]
                         return cleaned_data
+                    
+                    # Check if the image is thresholded, default is 0.25 "defined" voxels
+                    brain_mask = nb.load(os.path.join(neurovault.settings.STATIC_ROOT,"anatomical","MNI152_mask.nii.gz"))
+                    brain = nb.load(os.path.join(neurovault.settings.STATIC_ROOT,"anatomical","MNI152.nii.gz"))
+                    nii_resample = _resample_img_ref(image=nii,reference=brain,interpolation="nearest")
+                    is_thr, perc_bad = is_thresholded(nii_obj=nii_resample,brain_mask=brain_mask)
+                    if is_thr and not cleaned_data.get("ignore_warning_checkbox"):
+                        self._errors["file"] = self.error_class(["This file seems to be thresholded (%d%% of voxels are zeroes).\n Please use an unthresholded version of the map if possible."%(perc_bad*100)])
+                        self.fields["ignore_warning_checkbox"].widget = forms.CheckboxInput()
+                        return cleaned_data
+                        
     
                     # convert to nii.gz if needed
                     if ext.lower() != ".nii.gz" or squeezable_dimensions < len(nii.shape):
@@ -448,11 +461,13 @@ class StatisticMapForm(ImageForm):
                                                          to_field_name="cog_atlas_id", 
                                                          help_text="Task (or lack of it) performed by the subjects in the scanner described using <a href='http://www.cognitiveatlas.org/'>Cognitive Atlas</a> terms", 
                                                          label="Cognitive Paradigm")
+            
     class Meta(ImageForm.Meta):
         model = StatisticMap
         fields = ('name', 'collection', 'description', 'map_type', 'modality', 'cognitive_paradigm_cogatlas', 'contrast_definition', 'figure',
-                  'file', 'hdr_file', 'tags', 'statistic_parameters',
+                  'file', 'ignore_warning_checkbox', 'hdr_file', 'tags', 'statistic_parameters',
                   'smoothness_fwhm')
+    
 
 
 class AtlasForm(ImageForm):
@@ -499,7 +514,7 @@ class SimplifiedStatisticMapForm(EditStatisticMapForm):
 
     class Meta(EditStatisticMapForm.Meta):
         fields = ('name', 'collection', 'description', 'map_type', 'modality', 'cognitive_paradigm_cogatlas',
-                  'file', 'hdr_file', 'tags')
+                  'file', 'ignore_warning_checkbox', 'hdr_file', 'tags')
 
 
 class CollectionInlineFormset(BaseInlineFormSet):
