@@ -4,13 +4,15 @@ from neurovault.apps.statmaps.models import Image, Collection, StatisticMap,\
     Atlas, NIDMResults, NIDMResultStatisticMap, CognitiveAtlasTask
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework.filters import DjangoFilterBackend
+from rest_framework.pagination import LimitOffsetPagination
 from django.conf.urls import patterns, include, url
 from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib import admin
 from lxml.etree import xmlfile
 admin.autodiscover()
-from rest_framework import viewsets, routers, serializers, mixins, generics
+from rest_framework import viewsets, routers, serializers, mixins, generics,\
+    pagination
 from neurovault.apps.statmaps.views import get_image,get_collection
 from rest_framework.decorators import detail_route, list_route
 from django.contrib.auth.models import User, Group
@@ -342,9 +344,13 @@ class CollectionViewSet(mixins.RetrieveModelMixin,
     @detail_route()
     def images(self, request, pk=None):
         collection = get_collection(pk,request,mode='api')
-        queryset = collection.image_set
-        serializer = ImageSerializer(queryset, context={'request': request}, many=True)
-        return Response(serializer.data)
+        queryset = Image.objects.filter(collection=collection)
+        paginator = LimitOffsetPagination()
+        paginator.default_limit = 100
+        paginator.max_limit = 1000
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = ImageSerializer(page, context={'request': request}, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def retrieve(self, request, pk=None):
         collection = get_collection(pk,request,mode='api')
