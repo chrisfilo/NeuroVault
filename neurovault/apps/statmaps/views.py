@@ -560,6 +560,14 @@ def serve_image(request, collection_cid, img_name):
     path = os.path.join(settings.PRIVATE_MEDIA_ROOT,'images',str(collection.id),img_name)
     return sendfile(request, path)
 
+def serve_image_universal(request, pk, collection_cid=None):
+    image = get_image(pk,collection_cid,request)
+    path = os.path.join(settings.PRIVATE_MEDIA_ROOT, image.file.name)
+    if image.name.endswith(".nii.gz"):
+        download_filename = image.name
+    else:
+        download_filename = image.name + ".nii.gz"
+    return sendfile(request, path, attachment=True, attachment_filename=download_filename)
 
 def serve_pycortex(request, collection_cid, path, pycortex_dir='pycortex_all'):
     collection = get_collection(collection_cid,request,mode='file')

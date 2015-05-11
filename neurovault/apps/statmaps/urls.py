@@ -7,7 +7,7 @@ from .views import edit_collection, edit_images, view_image, delete_image, edit_
                 serve_image, serve_pycortex, view_collection_with_pycortex, add_image, \
                 papaya_js_embed, view_images_by_tag, \
                 view_image_with_pycortex, stats_view, serve_nidm, serve_nidm_image, \
-                view_nidm_results, find_similar, compare_images
+                view_nidm_results, find_similar, compare_images, serve_image_universal
 from neurovault.apps.statmaps.models import KeyValueTag
 from django.db.models import Count
 from django.contrib.auth.decorators import login_required
@@ -77,6 +77,12 @@ urlpatterns = patterns('',
     url(r'^images/(?P<pk>\d+)/$',
         view_image,
         name='image_details'),
+    url(r'^images/(?P<pk>\d+)/download$',
+        serve_image_universal,
+        name='serve_image_universal'),
+    url(r'^collections/(?P<collection_cid>\d+|[A-Z]{8})/images/(?P<pk>\d+)/download$',
+        serve_image_universal,
+        name="serve_private_image_universal"),
     url(r'^images/(?P<pk>\d+)/pycortex$',
         view_image_with_pycortex,
         name='pycortex_view_image'),
