@@ -36,7 +36,7 @@ class NIDMResultsTest(TestCase):
             },
             'ds000001_Con1_nidm_001': {
                 'file': os.path.join(testpath,'test_data/nidm/ds000001_Con1_nidm_001.nidm.zip'),
-                'output_row': {'type': u'F','name': u'Statistic Map: Con1: pumps realRT - ctrl realRT',},
+                'output_row': {'type': u'T','name': u'Statistic Map: Con1: pumps realRT - ctrl realRT',},
                 'num_statmaps': 1,
             },
         }
