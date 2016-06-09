@@ -1,4 +1,4 @@
-FROM python:2.7
+FROM python:2.7.8-wheezy
 ENV PYTHONUNBUFFERED 1
 RUN apt-get update && apt-get install -y \
     libopenblas-dev \
